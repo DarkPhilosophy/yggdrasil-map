@@ -8,13 +8,15 @@ import socket
 from collections import defaultdict, deque
 from pathlib import Path
 
+RPC_TIMEOUT_SECONDS = 2.0
+
 
 def rpc(sock_path: str, request: str, arguments: dict | None = None) -> dict:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(sock_path)
     sock.sendall(json.dumps({"request": request, "arguments": arguments or {}, "keepalive": False}).encode())
     chunks = []
-    sock.settimeout(2)
+    sock.settimeout(RPC_TIMEOUT_SECONDS)
     try:
       while True:
           data = sock.recv(65535)
@@ -113,8 +115,10 @@ def build_layout(node_ids: list[str], links: list[dict], source_key: str) -> dic
 
     layout = {}
     component_count = max(1, len(components))
+    golden_angle = 2.399963229728653
+
     for component_index, (root, component_nodes) in enumerate(components):
-        levels = defaultdict(list)
+        order = []
         depths = {}
         queue = deque([(root, 0)])
         while queue:
@@ -122,30 +126,29 @@ def build_layout(node_ids: list[str], links: list[dict], source_key: str) -> dic
             if current in depths:
                 continue
             depths[current] = depth
-            levels[depth].append(current)
-            for neighbor in sorted(adjacency.get(current, [])):
+            order.append(current)
+            neighbors = sorted(adjacency.get(current, []), key=lambda node: (-len(adjacency.get(node, [])), node))
+            for neighbor in neighbors:
                 if neighbor not in depths:
                     queue.append((neighbor, depth + 1))
 
         for orphan in sorted(component_nodes):
             if orphan not in depths:
-                depths[orphan] = 0
-                levels[0].append(orphan)
+                depths[orphan] = max(depths.values(), default=0) + 1
+                order.append(orphan)
 
-        max_depth = max(depths.values()) if depths else 0
         center_x = 0.5 if component_count == 1 else 0.16 + component_index * (0.68 / max(1, component_count - 1))
         center_y = 0.52
-        for depth, keys in sorted(levels.items()):
-            count = len(keys)
-            radius = 0.06 + depth * (0.32 / max(1, max_depth))
-            for index, key in enumerate(keys):
-                angle = -math.pi / 2 if count == 1 else -math.pi / 2 + (index / count) * (2 * math.pi)
-                x = center_x + math.cos(angle) * radius * 0.92
-                y = center_y + math.sin(angle) * radius * 0.74
-                layout[key] = (
-                    round(min(0.94, max(0.06, x)), 4),
-                    round(min(0.9, max(0.12, y)), 4),
-                )
+        layout[root] = (round(center_x, 4), round(center_y, 4))
+        for index, key in enumerate(order[1:], start=1):
+            radius = min(0.4, 0.03 + 0.032 * math.sqrt(index))
+            angle = index * golden_angle
+            x = center_x + math.cos(angle) * radius * 1.12
+            y = center_y + math.sin(angle) * radius * 0.84
+            layout[key] = (
+                round(min(0.95, max(0.05, x)), 4),
+                round(min(0.91, max(0.11, y)), 4),
+            )
     return layout
 
 
@@ -176,12 +179,16 @@ def save_state(path: Path | None, *, nodes: dict, peer_links: set[tuple[str, str
 
 
 def main() -> int:
+    global RPC_TIMEOUT_SECONDS
     parser = argparse.ArgumentParser(description="Export a topology snapshot from a live Yggdrasil admin socket")
     parser.add_argument("--socket", default="/var/run/yggdrasil/yggdrasil.sock")
     parser.add_argument("--max-nodes", type=int, default=40)
+    parser.add_argument("--max-discovered", type=int, default=5000)
+    parser.add_argument("--rpc-timeout", type=float, default=0.85)
     parser.add_argument("--state-file", type=Path)
     parser.add_argument("-o", "--output", type=Path)
     args = parser.parse_args()
+    RPC_TIMEOUT_SECONDS = max(0.2, float(args.rpc_timeout))
 
     self_doc = rpc(args.socket, "getSelf").get("response", {})
     tree = rpc(args.socket, "getTree").get("response", {}).get("tree", [])
@@ -262,7 +269,11 @@ def main() -> int:
             peer_links.add(tuple(sorted((key, remote_key))))
 
         for discovered_key in dedupe_keys(peer_keys + tree_keys):
-            if discovered_key not in crawled and discovered_key not in discovered_total and len(discovered_total) < args.max_nodes * 4:
+            if (
+                discovered_key not in crawled
+                and discovered_key not in discovered_total
+                and len(discovered_total) < args.max_discovered
+            ):
                 queue.append(discovered_key)
                 discovered_total.add(discovered_key)
 
@@ -334,6 +345,8 @@ def main() -> int:
         "node_count": len(nodes),
         "link_count": len(links),
         "crawl_max_nodes": args.max_nodes,
+        "crawl_max_discovered": args.max_discovered,
+        "crawl_rpc_timeout": RPC_TIMEOUT_SECONDS,
         "crawled_node_count": len(crawled),
         "crawled_this_run": crawled_this_run,
         "crawl_frontier_remaining": len(queue),

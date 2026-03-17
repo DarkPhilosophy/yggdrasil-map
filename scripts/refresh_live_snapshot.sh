@@ -5,6 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 mkdir -p /var/lib/ygg-topology
 python3 "$ROOT_DIR/scripts/export_live_admin_snapshot.py" \
+  --max-nodes 72 \
+  --max-discovered 6000 \
+  --rpc-timeout 0.85 \
   --state-file /var/lib/ygg-topology/crawl-state.json | sudo -u postgres python3 "$ROOT_DIR/scripts/load_snapshot_to_pg.py" \
   - \
   --host /var/run/postgresql \
