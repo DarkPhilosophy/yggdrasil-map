@@ -6,6 +6,7 @@ See:
 
 - `docs/UPSTREAM_AUDIT.md`
 - `docs/AXXA_MODERNIZATION_PLAN.md`
+- `docs/POSTGRES_PLAN.md`
 
   * Internet: https://yggdrasil-map.cwinfo.net
   * Hyperboria: https://yggdrasil-map.h.cwinfo.net
