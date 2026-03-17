@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import subprocess
 import tempfile
 from pathlib import Path
@@ -113,7 +114,7 @@ def build_sql(payload: dict, source: str, source_revision: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Load a normalized Ygg map snapshot into PostgreSQL")
-    parser.add_argument("input", type=Path, help="Path to normalized snapshot JSON")
+    parser.add_argument("input", help="Path to normalized snapshot JSON or - for stdin")
     parser.add_argument("--host", default=os.getenv("PGHOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("PGPORT", "15432")))
     parser.add_argument("--dbname", default=os.getenv("PGDATABASE", "ygg"))
@@ -123,7 +124,10 @@ def main() -> int:
     parser.add_argument("--source-revision", default="manual")
     args = parser.parse_args()
 
-    payload = json.loads(args.input.read_text(encoding="utf-8"))
+    if args.input == "-":
+        payload = json.loads(sys.stdin.read())
+    else:
+        payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
     output = run_psql(
       build_sql(payload, args.source, args.source_revision),
       host=args.host,
