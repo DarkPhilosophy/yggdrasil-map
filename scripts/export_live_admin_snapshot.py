@@ -147,10 +147,37 @@ def build_layout(node_ids: list[str], links: list[dict], source_key: str) -> dic
     return layout
 
 
+def load_state(path: Path | None) -> dict:
+    if not path or not path.exists():
+        return {"nodes": {}, "peer_links": [], "frontier": []}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"nodes": {}, "peer_links": [], "frontier": []}
+    return {
+        "nodes": data.get("nodes", {}) if isinstance(data.get("nodes", {}), dict) else {},
+        "peer_links": data.get("peer_links", []) if isinstance(data.get("peer_links", []), list) else [],
+        "frontier": data.get("frontier", []) if isinstance(data.get("frontier", []), list) else [],
+    }
+
+
+def save_state(path: Path | None, *, nodes: dict, peer_links: set[tuple[str, str]], frontier: deque[str]) -> None:
+    if not path:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "nodes": nodes,
+        "peer_links": [list(edge) for edge in sorted(peer_links)],
+        "frontier": list(frontier),
+    }
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Export a topology snapshot from a live Yggdrasil admin socket")
     parser.add_argument("--socket", default="/var/run/yggdrasil/yggdrasil.sock")
-    parser.add_argument("--max-nodes", type=int, default=96)
+    parser.add_argument("--max-nodes", type=int, default=40)
+    parser.add_argument("--state-file", type=Path)
     parser.add_argument("-o", "--output", type=Path)
     args = parser.parse_args()
 
@@ -166,27 +193,26 @@ def main() -> int:
     tree_map = {entry["key"]: entry for entry in tree if entry.get("key")}
     path_map = {entry["key"]: entry for entry in paths if entry.get("key")}
     session_map = {entry["key"]: entry for entry in sessions if entry.get("key")}
-    peer_map = {}
-    for entry in peers:
-        key = entry.get("key")
-        if key:
-            peer_map.setdefault(key, []).append(entry)
-
-    queue = deque()
-    for candidate in dedupe_keys(
+    seed_keys = dedupe_keys(
         [self_doc.get("key", "")]
         + [entry.get("key", "") for entry in peers]
         + [entry.get("key", "") for entry in tree]
-    ):
-        queue.append(candidate)
+    )
+    state = load_state(args.state_file)
+    crawled = state["nodes"]
+    peer_links = {
+        tuple(sorted(edge))
+        for edge in state["peer_links"]
+        if isinstance(edge, list) and len(edge) == 2 and edge[0] and edge[1] and edge[0] != edge[1]
+    }
+    queue = deque(dedupe_keys(state["frontier"] + seed_keys))
+    discovered_total = set(queue) | set(crawled.keys())
 
-    crawled = {}
-    peer_links = set()
-    discovered_total = set(queue)
-
-    while queue and len(crawled) < args.max_nodes:
+    crawled_this_run = 0
+    while queue and crawled_this_run < args.max_nodes:
         key = queue.popleft()
-        if key in crawled:
+        should_refresh = key not in crawled or key in seed_keys
+        if not should_refresh:
             continue
 
         if key == self_doc.get("key"):
@@ -205,6 +231,7 @@ def main() -> int:
         info = rpc(args.socket, "getNodeInfo", {"key": key}).get("response", {}).get(key, {})
         label = info.get("name") or info.get("site") or short_label(address or tree_map.get(key, {}).get("address", ""), key)
 
+        peer_links = {edge for edge in peer_links if key not in edge}
         crawled[key] = {
             "key": key,
             "address": address or tree_map.get(key, {}).get("address", ""),
@@ -225,6 +252,7 @@ def main() -> int:
                 "contact": info.get("contact", ""),
             },
         }
+        crawled_this_run += 1
 
         for remote_key in peer_keys:
             if remote_key == key:
@@ -235,6 +263,8 @@ def main() -> int:
             if discovered_key not in crawled and discovered_key not in discovered_total and len(discovered_total) < args.max_nodes * 4:
                 queue.append(discovered_key)
                 discovered_total.add(discovered_key)
+
+    save_state(args.state_file, nodes=crawled, peer_links=peer_links, frontier=queue)
 
     links = []
     seen_links = set()
@@ -303,6 +333,8 @@ def main() -> int:
         "link_count": len(links),
         "crawl_max_nodes": args.max_nodes,
         "crawled_node_count": len(crawled),
+        "crawled_this_run": crawled_this_run,
+        "crawl_frontier_remaining": len(queue),
         "nodes": nodes,
         "links": links,
     }
