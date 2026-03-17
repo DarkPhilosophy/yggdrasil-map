@@ -1,4 +1,4 @@
-create table if not exists ygg_map_snapshot (
+create table if not exists topology_snapshot (
   id bigserial primary key,
   created_at timestamptz not null default now(),
   source text not null,
@@ -8,11 +8,11 @@ create table if not exists ygg_map_snapshot (
   payload jsonb not null
 );
 
-create index if not exists ygg_map_snapshot_created_at_idx
-  on ygg_map_snapshot (created_at desc);
+create index if not exists topology_snapshot_created_at_idx
+  on topology_snapshot (created_at desc);
 
-create table if not exists ygg_map_node (
-  snapshot_id bigint not null references ygg_map_snapshot(id) on delete cascade,
+create table if not exists topology_node (
+  snapshot_id bigint not null references topology_snapshot(id) on delete cascade,
   node_id text not null,
   node_key text,
   address text,
@@ -26,11 +26,11 @@ create table if not exists ygg_map_node (
   primary key (snapshot_id, node_id)
 );
 
-create index if not exists ygg_map_node_name_idx
-  on ygg_map_node (name);
+create index if not exists topology_node_name_idx
+  on topology_node (name);
 
-create table if not exists ygg_map_link (
-  snapshot_id bigint not null references ygg_map_snapshot(id) on delete cascade,
+create table if not exists topology_link (
+  snapshot_id bigint not null references topology_snapshot(id) on delete cascade,
   source_node_id text not null,
   target_node_id text not null,
   kind text not null default 'mesh',
@@ -38,7 +38,7 @@ create table if not exists ygg_map_link (
   primary key (snapshot_id, source_node_id, target_node_id, kind)
 );
 
-create table if not exists ygg_node_probe (
+create table if not exists topology_probe (
   id bigserial primary key,
   measured_at timestamptz not null default now(),
   node_id text not null,
@@ -49,5 +49,5 @@ create table if not exists ygg_node_probe (
   metadata jsonb not null default '{}'::jsonb
 );
 
-create index if not exists ygg_node_probe_node_id_measured_at_idx
-  on ygg_node_probe (node_id, measured_at desc);
+create index if not exists topology_probe_node_id_measured_at_idx
+  on topology_probe (node_id, measured_at desc);

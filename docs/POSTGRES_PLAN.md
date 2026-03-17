@@ -10,10 +10,10 @@
 ## Minimal flow
 
 1. Collector fetches or builds a normalized snapshot.
-2. Snapshot is inserted into `ygg_map_snapshot`.
-3. Nodes are inserted into `ygg_map_node`.
-4. Links are inserted into `ygg_map_link`.
-5. Probe jobs append rows to `ygg_node_probe`.
+2. Snapshot is inserted into `topology_snapshot`.
+3. Nodes are inserted into `topology_node`.
+4. Links are inserted into `topology_link`.
+5. Probe jobs append rows to `topology_probe`.
 
 ## Why this is worth it
 
