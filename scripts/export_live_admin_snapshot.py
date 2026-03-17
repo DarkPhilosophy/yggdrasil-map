@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import socket
 from collections import defaultdict, deque
 from pathlib import Path
@@ -132,17 +133,18 @@ def build_layout(node_ids: list[str], links: list[dict], source_key: str) -> dic
                 levels[0].append(orphan)
 
         max_depth = max(depths.values()) if depths else 0
-        segment_width = 0.76 / component_count
-        segment_left = 0.12 + component_index * segment_width
-        segment_inner = max(0.12, segment_width)
+        center_x = 0.5 if component_count == 1 else 0.16 + component_index * (0.68 / max(1, component_count - 1))
+        center_y = 0.52
         for depth, keys in sorted(levels.items()):
             count = len(keys)
+            radius = 0.06 + depth * (0.32 / max(1, max_depth))
             for index, key in enumerate(keys):
-                x_ratio = 0.5 if count == 1 else index / max(1, count - 1)
-                y_ratio = 0.5 if max_depth == 0 else depth / max_depth
+                angle = -math.pi / 2 if count == 1 else -math.pi / 2 + (index / count) * (2 * math.pi)
+                x = center_x + math.cos(angle) * radius * 0.92
+                y = center_y + math.sin(angle) * radius * 0.74
                 layout[key] = (
-                    round(segment_left + x_ratio * segment_inner, 4),
-                    round(0.16 + y_ratio * 0.68, 4),
+                    round(min(0.94, max(0.06, x)), 4),
+                    round(min(0.9, max(0.12, y)), 4),
                 )
     return layout
 
