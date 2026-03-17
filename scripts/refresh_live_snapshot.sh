@@ -6,6 +6,7 @@ TMP_JSON="$(mktemp /tmp/ygg-topology-XXXXXX.json)"
 trap 'rm -f "$TMP_JSON"' EXIT
 
 python3 "$ROOT_DIR/scripts/export_live_admin_snapshot.py" --output "$TMP_JSON"
+chmod 644 "$TMP_JSON"
 sudo -u postgres python3 "$ROOT_DIR/scripts/load_snapshot_to_pg.py" \
   "$TMP_JSON" \
   --host /var/run/postgresql \
