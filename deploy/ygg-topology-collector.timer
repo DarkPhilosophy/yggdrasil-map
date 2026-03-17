@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Yggdrasil topology collector every 5 minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=5m
+Unit=ygg-topology-collector.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

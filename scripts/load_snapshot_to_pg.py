@@ -116,7 +116,7 @@ def main() -> int:
     parser.add_argument("input", type=Path, help="Path to normalized snapshot JSON")
     parser.add_argument("--host", default=os.getenv("PGHOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("PGPORT", "15432")))
-    parser.add_argument("--dbname", default=os.getenv("PGDATABASE", "brain"))
+    parser.add_argument("--dbname", default=os.getenv("PGDATABASE", "ygg"))
     parser.add_argument("--user", default=os.getenv("PGUSER", "postgres"))
     parser.add_argument("--password", default=os.getenv("PGPASSWORD", ""))
     parser.add_argument("--source", default="axxa-api")
