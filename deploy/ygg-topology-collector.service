@@ -5,6 +5,5 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=postgres
 WorkingDirectory=/opt/yggdrasil-map
 ExecStart=/opt/yggdrasil-map/scripts/refresh_live_snapshot.sh
