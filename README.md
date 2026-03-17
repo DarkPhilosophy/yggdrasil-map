@@ -1,5 +1,12 @@
 # Yggdrasil map
 
+This fork is being used as a research and extraction base for a modern AXXA-hosted map implementation.
+
+See:
+
+- `docs/UPSTREAM_AUDIT.md`
+- `docs/AXXA_MODERNIZATION_PLAN.md`
+
   * Internet: https://yggdrasil-map.cwinfo.net
   * Hyperboria: https://yggdrasil-map.h.cwinfo.net
   * Yggdrasil Network: https://yggdrasil-map.y.cwinfo.net
